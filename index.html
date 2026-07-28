@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자본조달 이벤트 캘린더</title>
+<style>
+/* Theme: Ocean Depths - Deep Navy #1a2332 · Teal #2d8b8b · Seafoam #a8dadc · Cream #f1faee */
+:root{
+  --bg:#141c29; --panel:#1a2332; --panel2:#212d40; --line:rgba(168,218,220,.16);
+  --line2:rgba(168,218,220,.09);
+  --tx:#f1faee; --tx2:#a8dadc; --tx3:#6f8f9c;
+  --teal:#2d8b8b; --teal-hi:#3aa9a9; --teal-bg:rgba(45,139,139,.18);
+  --foam:#a8dadc; --foam-bg:rgba(168,218,220,.12);
+  --cream:#f1faee;
+  --shadow:0 2px 6px rgba(0,0,0,.35),0 12px 34px rgba(0,0,0,.30);
+}
+:root[data-theme=light]{
+  --bg:#eef6f1; --panel:#ffffff; --panel2:#f4faf7; --line:#cfe4e2; --line2:#e2efed;
+  --tx:#1a2332; --tx2:#3f5a66; --tx3:#7d97a1;
+  --teal:#237a7a; --teal-hi:#2d8b8b; --teal-bg:rgba(45,139,139,.12);
+  --foam:#4d8f96; --foam-bg:rgba(45,139,139,.08);
+  --cream:#f1faee;
+  --shadow:0 1px 3px rgba(26,35,50,.08),0 8px 26px rgba(26,35,50,.09);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-size:14px;line-height:1.55;
+  font-family:"DejaVu Sans","Segoe UI","Malgun Gothic","맑은 고딕",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;word-break:keep-all;overflow-wrap:break-word}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+a{color:var(--teal-hi);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 20px 70px}
+
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:14px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.18em;color:var(--teal-hi);text-transform:uppercase}
+h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
+.sub{color:var(--tx2);font-size:12.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;
+  padding:3px 11px;font-size:11.5px;color:var(--tx2);white-space:nowrap}
+.chip b{color:var(--tx);font-weight:700}
+.tgl{background:var(--panel);border:1px solid var(--line);color:var(--tx2);border-radius:9px;
+  padding:6px 11px;cursor:pointer;font-size:13px}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.toolbar input,.toolbar select{background:var(--panel);border:1px solid var(--line);color:var(--tx);
+  border-radius:9px;padding:7px 10px;font-size:13px;font-family:inherit}
+.toolbar input[type=search]{min-width:190px}
+.count{color:var(--tx2);font-size:12.5px;margin-left:auto}
+
+.layout{display:grid;grid-template-columns:5fr 7fr;gap:14px;align-items:start}
+@media(max-width:860px){.layout{grid-template-columns:1fr}}
+
+/* company list */
+.list{display:flex;flex-direction:column;gap:8px}
+.row{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px 13px;
+  cursor:pointer;box-shadow:var(--shadow);transition:.12s;display:flex;gap:11px;align-items:center}
+.row:hover{border-color:var(--teal-hi)}
+.row.active{border-color:var(--teal-hi);box-shadow:0 0 0 2px var(--teal-hi) inset,var(--shadow)}
+.dday{flex:none;min-width:52px;text-align:center;border-radius:9px;padding:6px 4px;
+  font-weight:800;font-size:13px;background:var(--foam-bg);color:var(--foam)}
+.dday.hot{background:var(--teal);color:var(--cream)}
+.dday .dl{display:block;font-size:9.5px;font-weight:600;opacity:.85;margin-top:1px}
+.rmain{min-width:0;flex:1}
+.rname{font-weight:700;font-size:14px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.code{color:var(--tx3);font-size:11px;font-weight:400}
+.rnext{color:var(--tx2);font-size:12px;margin-top:2px}
+.badge{display:inline-flex;align-items:center;border-radius:6px;padding:1px 7px;
+  font-size:10.5px;font-weight:700;white-space:nowrap;background:var(--teal-bg);color:var(--teal-hi);
+  border:1px solid transparent}
+.badge.o{background:transparent;border-color:var(--line);color:var(--tx2)}
+
+/* detail panel */
+.detail{background:var(--panel);border:1px solid var(--line);border-radius:15px;
+  box-shadow:var(--shadow);padding:18px 20px;position:sticky;top:14px}
+.detail .dt-head{border-bottom:1px solid var(--line2);padding-bottom:12px;margin-bottom:14px}
+.dt-name{font-size:19px;font-weight:800;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.dt-meta{color:var(--tx2);font-size:12.5px;margin-top:3px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font-size:13px;margin:0 0 16px}
+.kv .k{color:var(--tx2)}
+.kv .v{text-align:right;font-variant-numeric:tabular-nums}
+.sec{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-hi);
+  font-weight:800;margin:0 0 10px}
+
+/* timeline */
+.tl{list-style:none;margin:0;padding:0;position:relative}
+.tl::before{content:"";position:absolute;left:86px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.tl li{display:flex;gap:0;align-items:flex-start;padding:6px 0;position:relative}
+.tl .d{width:74px;flex:none;text-align:right;color:var(--tx2);font-size:12px;padding-top:1px}
+.tl .dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--tx3);
+  margin:5px 12px 0 8px;box-shadow:0 0 0 3px var(--panel);position:relative;z-index:1}
+.tl .lb{flex:1;font-size:13.2px;min-width:0}
+.tl .sub2{color:var(--tx3);font-size:11px}
+.tl li.past .lb,.tl li.past .d{color:var(--tx3)}
+.tl li.past .dot{background:var(--line)}
+.tl li.next .dot{background:var(--teal-hi);box-shadow:0 0 0 3px var(--panel),0 0 0 5px var(--teal-bg)}
+.tl li.next .lb{font-weight:700}
+.tl li.future .dot{background:var(--foam)}
+.tl .conf{display:inline-block;margin-left:7px;font-size:10px;font-weight:800;
+  background:var(--teal-bg);color:var(--teal-hi);border-radius:5px;padding:0 6px;vertical-align:1px}
+.tl .dday2{color:var(--teal-hi);font-weight:700;font-size:11.5px;margin-left:7px}
+
+.empty{padding:48px 20px;text-align:center;color:var(--tx2)}
+.footer{color:var(--tx3);font-size:11.5px;margin-top:22px;line-height:1.7}
+.loading{padding:60px;text-align:center;color:var(--tx2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Ocean Depths · Event Intel</div>
+      <h1>자본조달 이벤트 캘린더</h1>
+      <div class="sub">진행 중인 유·무상증자, CB·BW·EB의 남은 일정을 기업별 시계열로</div>
+    </div>
+    <div class="chips" id="meta"></div>
+  </header>
+
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="종목명·코드 검색">
+    <select id="fType">
+      <option value="">전체 유형</option>
+      <option value="paid_capital_increase">유상증자</option>
+      <option value="free_capital_increase">무상증자</option>
+      <option value="mixed_capital_increase">유무상증자</option>
+      <option value="convertible_bond">CB</option>
+      <option value="bond_with_warrant">BW</option>
+      <option value="exchangeable_bond">EB</option>
+    </select>
+    <select id="fSort">
+      <option value="next">다음 일정 임박순</option>
+      <option value="recent">최근 공시순</option>
+    </select>
+    <button class="tgl" id="themeBtn" title="테마 전환">◐</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="layout">
+    <div class="list" id="list"></div>
+    <aside class="detail" id="detail"><div class="empty">기업을 선택하세요</div></aside>
+  </div>
+
+  <div id="boot" class="loading">데이터 불러오는 중…</div>
+  <div class="footer" id="footer"></div>
+</div>
+
+<script>
+const TYPE_SHORT = {paid_capital_increase:'유상', free_capital_increase:'무상',
+  mixed_capital_increase:'유무상', convertible_bond:'CB',
+  bond_with_warrant:'BW', exchangeable_bond:'EB'};
+const state = {data:null, sel:null};
+const $ = s => document.querySelector(s);
+const nf = (v,d=0)=> v==null?'—':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:d});
+const pct = v => v==null?'—':(v>0?'+':'')+Number(v).toFixed(1)+'%';
+
+function todayStr(){
+  const t = new Date();
+  return `${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
+}
+function fmtD(d, base){
+  if(!d || d.length!==8) return d||'';
+  return d.slice(0,4)===base.slice(0,4) ? `${d.slice(4,6)}.${d.slice(6)}` :
+    `${d.slice(0,2)==='20'?d.slice(2,4):d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6)}`;
+}
+function ddayOf(d){
+  const t = todayStr();
+  const ms = (new Date(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6)))
+           - (new Date(+t.slice(0,4), +t.slice(4,6)-1, +t.slice(6)));
+  return Math.round(ms / 86400000);
+}
+// 실시간 D-day: 데이터 생성 이후 날짜가 지나도 다음 일정을 다시 고른다
+function nextItem(c){
+  const t = todayStr();
+  const longTail = ['만기','청구 종료','행사기간 종료'];
+  return c.items.find(it => it.date >= t && it.label !== '공시'
+    && !longTail.some(k => it.label.includes(k))) || null;
+}
+
+function rows(){
+  let r = state.data.companies.slice();
+  const q = $('#q').value.trim().toLowerCase();
+  if(q) r = r.filter(c => (c.corp_name||'').toLowerCase().includes(q) || (c.stock_code||'').includes(q));
+  const ty = $('#fType').value;
+  if(ty === 'paid_capital_increase') r = r.filter(c => c.event_type === ty || c.event_type === 'mixed_capital_increase');
+  else if(ty) r = r.filter(c => c.event_type === ty);
+  if($('#fSort').value === 'recent') r.sort((a,b)=> b.event_date.localeCompare(a.event_date));
+  else r.sort((a,b)=>{
+    const x = nextItem(a), y = nextItem(b);
+    return (x?x.date:'99999999').localeCompare(y?y.date:'99999999');
+  });
+  return r;
+}
+
+function renderList(){
+  const data = rows(), box = $('#list');
+  box.innerHTML = '';
+  const t = todayStr();
+  data.forEach(c=>{
+    const nx = nextItem(c);
+    const dd = nx ? ddayOf(nx.date) : null;
+    const el = document.createElement('div');
+    el.className = 'row' + (state.sel === c ? ' active' : '');
+    el.onclick = ()=>{ state.sel = c; renderList(); renderDetail();
+      if(innerWidth <= 860) $('#detail').scrollIntoView({behavior:'smooth'}); };
+    el.innerHTML = `
+      <div class="dday ${dd!=null && dd<=7 ? 'hot':''}">${dd==null?'—':(dd===0?'D-Day':'D-'+dd)}
+        <span class="dl">${nx?fmtD(nx.date,t):''}</span></div>
+      <div class="rmain">
+        <div class="rname">${c.corp_name} <span class="code num">${c.stock_code||''}</span>
+          <span class="badge">${TYPE_SHORT[c.event_type]||''}</span>
+          ${c.market?`<span class="badge o">${c.market}</span>`:''}</div>
+        <div class="rnext">${nx ? '다음 · ' + nx.label : '남은 일정 없음'}</div>
+      </div>`;
+    box.appendChild(el);
+  });
+  $('#count').textContent = `${data.length}개 기업 진행 중`;
+  if(!state.sel && data.length){ state.sel = data[0]; renderDetail();
+    document.querySelector('.row')?.classList.add('active'); }
+}
+
+function termsKv(c){
+  const t = c.terms||{}, kv=(k,v)=>v==null||v===''?'':`<div class="k">${k}</div><div class="v num">${v}</div>`;
+  if(['convertible_bond','bond_with_warrant','exchangeable_bond'].includes(c.event_type)){
+    return kv('발행 규모', t.raise_eok!=null?nf(t.raise_eok)+'억 원':'')
+      + kv('전환/행사가', t.conv_price!=null?nf(t.conv_price)+'원':'')
+      + kv('공시 전 종가', t.prev_close!=null?nf(t.prev_close)+'원':'')
+      + kv('주가/전환가', pct(t.moneyness_pct))
+      + kv('이론가/액면', pct(t.theory_vs_par_pct))
+      + kv('사모 여부', t.is_private==null?'—':(t.is_private?'사모':'공모'))
+      + kv('리픽싱 하한', t.refix_floor_pct!=null?t.refix_floor_pct+'%':'')
+      + kv('잠재 희석', t.dilution_pct!=null?t.dilution_pct+'%':'');
+  }
+  return kv('방식', t.method||'')
+    + kv('조달 규모', t.raise_eok!=null?nf(t.raise_eok)+'억 원':'')
+    + kv('발행가(추정)', t.implied_issue_price!=null?nf(t.implied_issue_price)+'원':'')
+    + kv('공시 전 종가', t.prev_close!=null?nf(t.prev_close)+'원':'')
+    + kv('할인율', t.discount_pct!=null?t.discount_pct+'%':'')
+    + kv('무상 비율', t.bonus_ratio!=null?'1주당 '+t.bonus_ratio+'주':'')
+    + kv('권리락 이론가', t.theo_ex_rights_price!=null?nf(t.theo_ex_rights_price)+'원':'')
+    + kv('희석', t.dilution_pct!=null?t.dilution_pct+'%':'');
+}
+
+function renderDetail(){
+  const c = state.sel, box = $('#detail');
+  if(!c){ box.innerHTML = '<div class="empty">기업을 선택하세요</div>'; return; }
+  const t = todayStr();
+  const nx = nextItem(c);
+  const lis = c.items.map(it=>{
+    const end = it.end ? ` ~ ${fmtD(it.end,t)}` : '';
+    const isPast = (it.end || it.date) < t;
+    const isNext = nx && it === nx;
+    const cls = isPast ? 'past' : (isNext ? 'next' : 'future');
+    const dd = !isPast && it.date >= t ? ddayOf(it.date) : null;
+    return `<li class="${cls}">
+      <span class="d num">${fmtD(it.date,t)}</span><span class="dot"></span>
+      <span class="lb">${it.label}${end?`<span class="sub2">${end}</span>`:''}
+        ${it.confirmed?`<a class="conf" href="${it.url}" target="_blank" rel="noopener">공시 ↗</a>`:''}
+        ${dd!=null && dd<=30 ? `<span class="dday2 num">${dd===0?'D-Day':'D-'+dd}</span>`:''}
+      </span></li>`;
+  }).join('');
+  box.innerHTML = `
+    <div class="dt-head">
+      <div class="dt-name">${c.corp_name} <span class="code num">${c.stock_code||''} · ${c.market||''}</span></div>
+      <div class="dt-meta">${c.event_label} · ${fmtD(c.event_date,t)} 공시 ·
+        <a href="${c.dart_url}" target="_blank" rel="noopener">DART 원문 ↗</a></div>
+    </div>
+    <div class="sec">발행 조건</div>
+    <div class="kv">${termsKv(c)}</div>
+    <div class="sec">일정 타임라인</div>
+    <ul class="tl">${lis}</ul>`;
+}
+
+function renderMeta(){
+  const m = state.data.meta;
+  $('#meta').innerHTML = [
+    `기준 <b>${m.generated_at}</b>`,
+    `진행 중 <b>${m.count}</b>건`,
+  ].map(x=>`<span class="chip">${x}</span>`).join('')
+  + `<button class="tgl" style="display:none"></button>`;
+  $('#footer').innerHTML = `${m.disclaimer||''} · 표시 기간 최근 ${m.window_days}일 공시 기준`;
+}
+
+async function boot(){
+  try{
+    state.data = await (await fetch('calendar_data.json?'+Date.now(),{cache:'no-store'})).json();
+    $('#boot').style.display='none';
+    renderMeta(); renderList();
+  }catch(e){
+    $('#boot').textContent = '데이터를 불러오지 못했습니다: ' + e;
+  }
+}
+['input','change'].forEach(ev=>['#q','#fType','#fSort'].forEach(s=>$(s).addEventListener(ev,()=>{renderList();})));
+$('#themeBtn').onclick = ()=>{
+  const r = document.documentElement;
+  const cur = r.getAttribute('data-theme') || 'dark';
+  r.setAttribute('data-theme', cur === 'light' ? 'dark' : 'light');
+};
+if(matchMedia('(prefers-color-scheme: light)').matches)
+  document.documentElement.setAttribute('data-theme','light');
+boot();
+</script>
+</body>
+</html>
