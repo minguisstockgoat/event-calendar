@@ -111,6 +111,23 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font-size:13px;margin:0 0 16px}
 .kv .k{color:var(--tx2)}
 .kv .v{text-align:right;font-variant-numeric:tabular-nums}
+/* 공시시점 -> 현재 병기 */
+.was{color:var(--tx3)}
+.arr{color:var(--tx3);margin:0 5px}
+.good{color:#4fc98a;font-weight:700}
+.bad{color:#e0736f;font-weight:700}
+:root[data-theme=light] .good{color:#1e8f5e}
+:root[data-theme=light] .bad{color:#c94f4f}
+.mini{display:inline-block;font-size:9.5px;font-weight:800;border-radius:4px;padding:0 5px;
+  margin-left:6px;vertical-align:1px;background:var(--teal-bg);color:var(--teal-hi)}
+.mini.est{background:var(--foam-bg);color:var(--foam)}
+/* 청약 판단 카드 */
+.decide{background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+  padding:12px 14px;margin:0 0 16px;display:flex;gap:18px;flex-wrap:wrap}
+.decide div{display:flex;flex-direction:column;gap:2px}
+.decide .k{color:var(--tx3);font-size:10.5px;white-space:nowrap}
+.decide .v{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums}
+.decide .v.small{font-size:13px;padding-top:3px}
 .sec{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-hi);
   font-weight:800;margin:0 0 10px}
 
@@ -164,6 +181,8 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
       <option value="next">다음 일정 임박순</option>
       <option value="recent">최근 공시순</option>
     </select>
+    <button class="tgl" id="refreshBtn" title="시세·데이터 갱신">↻ 시세</button>
+    <span class="chip" id="qstamp" style="display:none"></span>
     <button class="tgl" id="themeBtn" title="테마 전환">◐</button>
     <span class="count" id="count"></span>
   </div>
@@ -179,13 +198,27 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 </div>
 
 <script>
+// 실시간 시세 프록시 (Cloudflare Worker) URL. 비어 있으면 '↻ 시세' 버튼은
+// 최신 정적 데이터 재로드로 동작한다. 배포법: worker/DEPLOY.md
+const QUOTE_PROXY = '';
+
 const TYPE_SHORT = {paid_capital_increase:'유상', free_capital_increase:'무상',
   mixed_capital_increase:'유무상', convertible_bond:'CB',
   bond_with_warrant:'BW', exchangeable_bond:'EB'};
 const TYPE_CLASS = {paid_capital_increase:'t-paid', free_capital_increase:'t-free',
   mixed_capital_increase:'t-mixed', convertible_bond:'t-cb',
   bond_with_warrant:'t-bw', exchangeable_bond:'t-eb'};
-const state = {data:null, sel:null};
+const state = {data:null, sel:null, quotes:{}, qstamp:''};
+// 실시간 시세가 있으면 그걸, 없으면 export 시점 최신 종가를 쓴다
+function liveClose(c){
+  const q = state.quotes[c.stock_code];
+  return q && q.price ? q.price : (c.now && c.now.close) || null;
+}
+function liveStamp(c){
+  const q = state.quotes[c.stock_code];
+  if(q && q.price) return `실시간 ${q.time||''}`.trim();
+  return c.now && c.now.date ? `${c.now.date.slice(4,6)}.${c.now.date.slice(6)} 종가` : '';
+}
 const $ = s => document.querySelector(s);
 const nf = (v,d=0)=> v==null?'—':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:d});
 const pct = v => v==null?'—':(v>0?'+':'')+Number(v).toFixed(1)+'%';
@@ -256,26 +289,69 @@ function renderList(){
     document.querySelector('.row')?.classList.add('active'); }
 }
 
+// '공시시점 → 현재' 병기 셀
+function pairCell(was, now, goodPositive){
+  if(now==null || now==='') return was==null?'':String(was);
+  const nowCls = goodPositive==null ? '' : (goodPositive ? 'good' : 'bad');
+  if(was==null || was==='') return `<b class="${nowCls}">${now}</b>`;
+  return `<span class="was">${was}</span><span class="arr">→</span><b class="${nowCls}">${now}</b>`;
+}
+
 function termsKv(c){
-  const t = c.terms||{}, kv=(k,v)=>v==null||v===''?'':`<div class="k">${k}</div><div class="v num">${v}</div>`;
+  const t = c.terms||{}, n = c.now||{};
+  const kv=(k,v)=>v==null||v===''?'':`<div class="k">${k}</div><div class="v num">${v}</div>`;
+  const live = liveClose(c);
+  const liveCell = live ? `${nf(live)}원 <span class="was">(${liveStamp(c)})</span>` : '';
+
   if(['convertible_bond','bond_with_warrant','exchangeable_bond'].includes(c.event_type)){
+    const nowMoney = (live && t.conv_price) ? (live/t.conv_price-1)*100 : null;
     return kv('발행 규모', t.raise_eok!=null?nf(t.raise_eok)+'억 원':'')
       + kv('전환/행사가', t.conv_price!=null?nf(t.conv_price)+'원':'')
-      + kv('공시 전 종가', t.prev_close!=null?nf(t.prev_close)+'원':'')
-      + kv('주가/전환가', pct(t.moneyness_pct))
-      + kv('이론가/액면', pct(t.theory_vs_par_pct))
+      + kv('현재가', liveCell)
+      + kv('주가/전환가', pairCell(
+          t.moneyness_pct!=null?pct(t.moneyness_pct)+' 공시시점':null,
+          nowMoney!=null?pct(nowMoney):null,
+          nowMoney!=null?nowMoney>0:null))
+      + kv('이론가/액면 (공시시점)', pct(t.theory_vs_par_pct))
       + kv('사모 여부', t.is_private==null?'—':(t.is_private?'사모':'공모'))
       + kv('리픽싱 하한', t.refix_floor_pct!=null?t.refix_floor_pct+'%':'')
       + kv('잠재 희석', t.dilution_pct!=null?t.dilution_pct+'%':'');
   }
+  const issue = n.final_price || t.implied_issue_price;
+  const nowDisc = (live && issue) ? (live-issue)/live*100 : null;
+  const issueCell = n.final_price
+    ? `${nf(n.final_price)}원<span class="mini ${n.final_confirmed?'':'est'}">${n.final_confirmed?'확정':'예상'}</span>`
+    : (t.implied_issue_price!=null?nf(t.implied_issue_price)+'원 (추정)':'');
   return kv('방식', t.method||'')
     + kv('조달 규모', t.raise_eok!=null?nf(t.raise_eok)+'억 원':'')
-    + kv('발행가(추정)', t.implied_issue_price!=null?nf(t.implied_issue_price)+'원':'')
-    + kv('공시 전 종가', t.prev_close!=null?nf(t.prev_close)+'원':'')
-    + kv('할인율', t.discount_pct!=null?t.discount_pct+'%':'')
+    + kv('발행가', issueCell)
+    + kv('현재가', liveCell)
+    + kv('할인율', pairCell(
+        t.discount_pct!=null?t.discount_pct+'% 공시시점':null,
+        nowDisc!=null?nowDisc.toFixed(1)+'%':null,
+        nowDisc!=null?nowDisc>0:null))
     + kv('무상 비율', t.bonus_ratio!=null?'1주당 '+t.bonus_ratio+'주':'')
-    + kv('권리락 이론가', t.theo_ex_rights_price!=null?nf(t.theo_ex_rights_price)+'원':'')
+    + kv('권리락 이론가 (공시시점)', t.theo_ex_rights_price!=null?nf(t.theo_ex_rights_price)+'원':'')
     + kv('희석', t.dilution_pct!=null?t.dilution_pct+'%':'');
+}
+
+// 주주배정 유증 청약 판단 카드 (예상/확정 발행가 vs 현재가)
+function decideCard(c){
+  const n = c.now||{};
+  if(!n.final_price) return '';
+  const live = liveClose(c);
+  if(!live) return '';
+  const margin = (live - n.final_price) / live * 100;
+  const t = todayStr();
+  const lst = (c.items||[]).find(it=>it.label==='신주 상장' && it.date>=t);
+  const dd = lst ? ddayOf(lst.date) : null;
+  return `<div class="sec">청약 판단${n.final_confirmed?'':' · 예상 발행가는 규정식 근사'}</div>
+  <div class="decide">
+    <div><span class="k">발행가</span><span class="v">${nf(n.final_price)}원<span class="mini ${n.final_confirmed?'':'est'}">${n.final_confirmed?'확정':'예상'}</span></span></div>
+    <div><span class="k">현재가 대비 마진</span><span class="v ${margin>0?'good':'bad'}">${pct(margin)}</span></div>
+    ${dd!=null?`<div><span class="k">신주 상장까지</span><span class="v small">${dd===0?'D-Day':'D-'+dd} (${fmtD(lst.date,t)})</span></div>`:''}
+    <div><span class="k">현재가</span><span class="v small">${nf(live)}원 · ${liveStamp(c)}</span></div>
+  </div>`;
 }
 
 function renderDetail(){
@@ -304,6 +380,7 @@ function renderDetail(){
       <div class="dt-meta">${c.event_label} · ${fmtD(c.event_date,t)} 공시 ·
         <a href="${c.dart_url}" target="_blank" rel="noopener">DART 원문 ↗</a></div>
     </div>
+    ${decideCard(c)}
     <div class="sec">발행 조건</div>
     <div class="kv">${termsKv(c)}</div>
     <div class="sec">일정 타임라인</div>
@@ -329,6 +406,32 @@ async function boot(){
     $('#boot').textContent = '데이터를 불러오지 못했습니다: ' + e;
   }
 }
+// ↻ 시세: 프록시가 설정돼 있으면 실시간 시세, 아니면 최신 정적 데이터 재로드
+async function refreshQuotes(){
+  const btn=$('#refreshBtn'); btn.disabled=true; btn.textContent='갱신 중…';
+  try{
+    if(QUOTE_PROXY){
+      const codes=[...new Set(state.data.companies.map(c=>c.stock_code).filter(Boolean))];
+      for(let i=0;i<codes.length;i+=40){
+        const r=await fetch(`${QUOTE_PROXY}?codes=${codes.slice(i,i+40).join(',')}`);
+        const j=await r.json();
+        Object.assign(state.quotes, j.quotes||{});
+      }
+      state.qstamp='실시간 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+    } else {
+      const selKey=state.sel && (state.sel.stock_code+state.sel.event_date);
+      state.data=await (await fetch('calendar_data.json?'+Date.now(),{cache:'no-store'})).json();
+      state.sel=state.data.companies.find(c=>c.stock_code+c.event_date===selKey)||null;
+      state.qstamp='정적 데이터 '+(state.data.meta.generated_at||'').slice(5,16)+' 기준';
+      renderMeta();
+    }
+  }catch(e){ state.qstamp='갱신 실패'; }
+  btn.disabled=false; btn.textContent='↻ 시세';
+  const st=$('#qstamp'); st.style.display=''; st.textContent=state.qstamp;
+  renderList(); renderDetail();
+}
+$('#refreshBtn').onclick=refreshQuotes;
+
 ['input','change'].forEach(ev=>['#q','#fType','#fSort'].forEach(s=>$(s).addEventListener(ev,()=>{renderList();})));
 $('#themeBtn').onclick = ()=>{
   const r = document.documentElement;
