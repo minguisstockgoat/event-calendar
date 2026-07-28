@@ -89,8 +89,15 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 :root[data-theme=light] .t-bw{--tc:#7e5fd0}
 :root[data-theme=light] .t-eb{--tc:#3f7fc0}
 .badge.ty{background:color-mix(in srgb, var(--tc) 17%, transparent);color:var(--tc)}
-.row{border-left:3px solid transparent}
-.row[class*="t-"]{border-left-color:var(--tc)}
+/* 행 박스 둘레 전체 + D-day 박스를 유형 색으로 - 한눈에 유형 구분 */
+:root{--pilltx:#0f1622}
+:root[data-theme=light]{--pilltx:#ffffff}
+.row[class*="t-"]{border-color:color-mix(in srgb, var(--tc) 62%, var(--panel))}
+.row[class*="t-"]:hover{border-color:var(--tc)}
+.row[class*="t-"].active{border-color:var(--tc);
+  box-shadow:0 0 0 2px var(--tc) inset,var(--shadow)}
+.row[class*="t-"] .dday{background:color-mix(in srgb, var(--tc) 22%, transparent);color:var(--tc)}
+.row[class*="t-"] .dday.hot{background:var(--tc);color:var(--pilltx)}
 
 /* detail panel */
 .detail{background:var(--panel);border:1px solid var(--line);border-radius:15px;
