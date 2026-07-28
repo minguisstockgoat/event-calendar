@@ -75,6 +75,23 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
   border:1px solid transparent}
 .badge.o{background:transparent;border-color:var(--line);color:var(--tx2)}
 
+/* 이벤트 유형별 색 (배지 텍스트 라벨 항상 동반 - 색만으로 구분하지 않음) */
+.t-paid{--tc:#2d8b8b}   /* 유상   teal   */
+.t-mixed{--tc:#3f9d77}  /* 유무상 청록   */
+.t-free{--tc:#7fb069}   /* 무상   green  */
+.t-cb{--tc:#e0a458}     /* CB     amber  */
+.t-bw{--tc:#a684ee}     /* BW     violet */
+.t-eb{--tc:#6aa3e0}     /* EB     blue   */
+:root[data-theme=light] .t-paid{--tc:#1f6f6f}
+:root[data-theme=light] .t-mixed{--tc:#2e7d5b}
+:root[data-theme=light] .t-free{--tc:#567f3e}
+:root[data-theme=light] .t-cb{--tc:#a9762a}
+:root[data-theme=light] .t-bw{--tc:#7e5fd0}
+:root[data-theme=light] .t-eb{--tc:#3f7fc0}
+.badge.ty{background:color-mix(in srgb, var(--tc) 17%, transparent);color:var(--tc)}
+.row{border-left:3px solid transparent}
+.row[class*="t-"]{border-left-color:var(--tc)}
+
 /* detail panel */
 .detail{background:var(--panel);border:1px solid var(--line);border-radius:15px;
   box-shadow:var(--shadow);padding:18px 20px;position:sticky;
@@ -158,6 +175,9 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 const TYPE_SHORT = {paid_capital_increase:'유상', free_capital_increase:'무상',
   mixed_capital_increase:'유무상', convertible_bond:'CB',
   bond_with_warrant:'BW', exchangeable_bond:'EB'};
+const TYPE_CLASS = {paid_capital_increase:'t-paid', free_capital_increase:'t-free',
+  mixed_capital_increase:'t-mixed', convertible_bond:'t-cb',
+  bond_with_warrant:'t-bw', exchangeable_bond:'t-eb'};
 const state = {data:null, sel:null};
 const $ = s => document.querySelector(s);
 const nf = (v,d=0)=> v==null?'—':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:d});
@@ -209,7 +229,8 @@ function renderList(){
     const nx = nextItem(c);
     const dd = nx ? ddayOf(nx.date) : null;
     const el = document.createElement('div');
-    el.className = 'row' + (state.sel === c ? ' active' : '');
+    const tc = TYPE_CLASS[c.event_type] || '';
+    el.className = 'row ' + tc + (state.sel === c ? ' active' : '');
     el.onclick = ()=>{ state.sel = c; renderList(); renderDetail();
       if(innerWidth <= 860) $('#detail').scrollIntoView({behavior:'smooth'}); };
     el.innerHTML = `
@@ -217,7 +238,7 @@ function renderList(){
         <span class="dl">${nx?fmtD(nx.date,t):''}</span></div>
       <div class="rmain">
         <div class="rname">${c.corp_name} <span class="code num">${c.stock_code||''}</span>
-          <span class="badge">${TYPE_SHORT[c.event_type]||''}</span>
+          <span class="badge ty ${tc}">${TYPE_SHORT[c.event_type]||''}</span>
           ${c.market?`<span class="badge o">${c.market}</span>`:''}</div>
         <div class="rnext">${nx ? '다음 · ' + nx.label : '남은 일정 없음'}</div>
       </div>`;
@@ -268,9 +289,11 @@ function renderDetail(){
         ${dd!=null && dd<=30 ? `<span class="dday2 num">${dd===0?'D-Day':'D-'+dd}</span>`:''}
       </span></li>`;
   }).join('');
+  const tc = TYPE_CLASS[c.event_type] || '';
   box.innerHTML = `
     <div class="dt-head">
-      <div class="dt-name">${c.corp_name} <span class="code num">${c.stock_code||''} · ${c.market||''}</span></div>
+      <div class="dt-name">${c.corp_name} <span class="code num">${c.stock_code||''} · ${c.market||''}</span>
+        <span class="badge ty ${tc}">${TYPE_SHORT[c.event_type]||''}</span></div>
       <div class="dt-meta">${c.event_label} · ${fmtD(c.event_date,t)} 공시 ·
         <a href="${c.dart_url}" target="_blank" rel="noopener">DART 원문 ↗</a></div>
     </div>
