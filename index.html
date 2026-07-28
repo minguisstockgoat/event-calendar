@@ -43,7 +43,9 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 .tgl{background:var(--panel);border:1px solid var(--line);color:var(--tx2);border-radius:9px;
   padding:6px 11px;cursor:pointer;font-size:13px}
 
-.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px;
+  position:sticky;top:0;z-index:30;background:var(--bg);
+  padding:10px 0;border-bottom:1px solid var(--line2)}
 .toolbar input,.toolbar select{background:var(--panel);border:1px solid var(--line);color:var(--tx);
   border-radius:9px;padding:7px 10px;font-size:13px;font-family:inherit}
 .toolbar input[type=search]{min-width:190px}
@@ -73,7 +75,9 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 
 /* detail panel */
 .detail{background:var(--panel);border:1px solid var(--line);border-radius:15px;
-  box-shadow:var(--shadow);padding:18px 20px;position:sticky;top:14px}
+  box-shadow:var(--shadow);padding:18px 20px;position:sticky;top:68px;
+  max-height:calc(100vh - 82px);overflow-y:auto}
+@media(max-width:860px){.detail{position:static;max-height:none}}
 .detail .dt-head{border-bottom:1px solid var(--line2);padding-bottom:12px;margin-bottom:14px}
 .dt-name{font-size:19px;font-weight:800;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
 .dt-meta{color:var(--tx2);font-size:12.5px;margin-top:3px}
