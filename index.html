@@ -200,7 +200,7 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 <script>
 // 실시간 시세 프록시 (Cloudflare Worker) URL. 비어 있으면 '↻ 시세' 버튼은
 // 최신 정적 데이터 재로드로 동작한다. 배포법: worker/DEPLOY.md
-const QUOTE_PROXY = '';
+const QUOTE_PROXY = 'https://krx-quote-proxy.eogks879.workers.dev';
 
 const TYPE_SHORT = {paid_capital_increase:'유상', free_capital_increase:'무상',
   mixed_capital_increase:'유무상', convertible_bond:'CB',

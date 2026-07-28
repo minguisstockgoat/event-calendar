@@ -1,39 +1,70 @@
 /**
  * KRX 실시간 시세 프록시 (Cloudflare Worker)
- * 브라우저는 CORS 때문에 네이버 시세 API를 직접 못 부르므로 이 워커가 중계한다.
- *   GET /?codes=005930,069540  ->  {quotes:{"005930":{price,change_pct,state,time},...}}
- * 배포: worker/DEPLOY.md 참고. 배포 후 index.html 의 QUOTE_PROXY 에 워커 URL 지정.
+ * 브라우저 CORS 제약 때문에 이 워커가 시세 API를 중계한다.
+ * 소스: Daum 금융(1순위) -> Naver 폴백. 둘 다 실시간 국내 시세.
+ *   GET /?codes=005930,069540   -> {quotes:{"005930":{price,change_pct,time},...}}
+ *   GET /?codes=005930&debug=1  -> 소스별 HTTP 상태 포함 (문제 진단용)
  */
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store",
+};
+
+async function fromDaum(code) {
+  const r = await fetch(`https://finance.daum.net/api/quotes/A${code}`, {
+    headers: {
+      accept: "application/json",
+      referer: `https://finance.daum.net/quotes/A${code}`,
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    },
+  });
+  if (!r.ok) throw new Error("daum " + r.status);
+  const j = await r.json();
+  if (!j.tradePrice) throw new Error("daum no price");
+  return {
+    price: j.tradePrice,
+    change_pct: Math.round((j.changeRate || 0) * 10000) / 100
+      * (j.change === "FALL" ? -1 : 1),
+    time: (j.tradeTime || "").replace(/(\d{2})(\d{2})(\d{2})?/, "$1:$2"),
+    src: "daum",
+  };
+}
+
+async function fromNaver(code) {
+  const r = await fetch(
+    `https://polling.finance.naver.com/api/realtime/domestic/stock/${code}`,
+    { headers: { accept: "application/json" } });
+  if (!r.ok) throw new Error("naver " + r.status);
+  const j = await r.json();
+  const d = j && j.datas && j.datas[0];
+  if (!d || !d.closePrice) throw new Error("naver no price");
+  return {
+    price: Number(String(d.closePrice).replace(/,/g, "")),
+    change_pct: Number(String(d.fluctuationsRatio || "").replace(/,/g, "")) || 0,
+    time: d.localTradedAt || "",
+    src: "naver",
+  };
+}
+
 export default {
   async fetch(req) {
-    const cors = {
-      "Access-Control-Allow-Origin": "*",
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-    };
     const url = new URL(req.url);
     const codes = (url.searchParams.get("codes") || "")
       .split(",").map(c => c.trim()).filter(c => /^\d{6}$/.test(c)).slice(0, 40);
     if (!codes.length)
       return new Response('{"error":"codes required (6-digit, comma-sep, max 40)"}',
-                          { status: 400, headers: cors });
-    const out = {};
+                          { status: 400, headers: CORS });
+    const debug = url.searchParams.get("debug") === "1";
+    const out = {}, errs = {};
     await Promise.all(codes.map(async code => {
-      try {
-        const r = await fetch(
-          `https://polling.finance.naver.com/api/realtime/domestic/stock/${code}`,
-          { headers: { accept: "application/json" } });
-        const j = await r.json();
-        const d = j && j.datas && j.datas[0];
-        if (d && d.closePrice) out[code] = {
-          price: Number(String(d.closePrice).replace(/,/g, "")),
-          change_pct: Number(String(d.fluctuationsRatio || "").replace(/,/g, "")) || 0,
-          state: d.marketStatus || "",
-          time: d.localTradedAt || "",
-        };
-      } catch (e) { /* 종목 단위 실패는 무시 */ }
+      try { out[code] = await fromDaum(code); return; }
+      catch (e) { if (debug) errs[code] = [String(e)]; }
+      try { out[code] = await fromNaver(code); }
+      catch (e) { if (debug) (errs[code] = errs[code] || []).push(String(e)); }
     }));
-    return new Response(JSON.stringify({ quotes: out, at: new Date().toISOString() }),
-                        { headers: cors });
+    const body = { quotes: out, at: new Date().toISOString() };
+    if (debug) body.errors = errs;
+    return new Response(JSON.stringify(body), { headers: CORS });
   },
 };
