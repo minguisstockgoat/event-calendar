@@ -184,6 +184,9 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 .st.on{background:rgba(224,115,111,.16);color:#e0736f}
 :root[data-theme=light] .st.on{background:rgba(201,79,79,.12);color:#c94f4f}
 .st.wait{background:var(--foam-bg);color:var(--foam)}
+.ohchart{height:260px;margin:4px 0 2px;position:relative}
+.ohchart .msg{padding:26px 0;text-align:center;color:var(--tx3);font-size:12px}
+.chartnote{color:var(--tx3);font-size:10.5px;margin:0 0 8px}
 
 /* 자동 갱신 LIVE 칩 */
 .pulse{display:inline-block;width:7px;height:7px;border-radius:50%;background:#4fc98a;
@@ -537,9 +540,96 @@ function ohEvLine(c, e){
     ${e.adv_days!=null?`<span class="badge o">ADV ${nf(e.adv_days,1)}일</span>`:''}
   </div>`;
 }
+// --- 오버행 주가 차트 (TradingView lightweight-charts + 전환가 수평선) ------
+const TYPE_LINE = {convertible_bond:'#e0a458', bond_with_warrant:'#a684ee',
+  exchangeable_bond:'#6aa3e0', cps:'#d98ca6'};
+let _lwLoad = null;
+function loadLW(){
+  if(window.LightweightCharts) return Promise.resolve();
+  if(_lwLoad) return _lwLoad;
+  _lwLoad = new Promise((res, rej)=>{
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js';
+    s.onload = res; s.onerror = ()=>rej(new Error('차트 라이브러리 로드 실패'));
+    document.head.appendChild(s);
+  });
+  return _lwLoad;
+}
+state.candles = {}; state.chartInst = new Map();
+async function renderOhChart(c, box){
+  box.innerHTML = '<div class="msg">차트 불러오는 중…</div>';
+  try{
+    if(!QUOTE_PROXY) throw new Error('시세 프록시 미설정');
+    await loadLW();
+    let rows = state.candles[c.stock_code];
+    if(!rows){
+      const r = await fetch(`${QUOTE_PROXY}?candles=${c.stock_code}&days=280`);
+      const j = await r.json();
+      rows = (j.candles||[]).filter(d=>d.o!=null&&d.h!=null&&d.l!=null)
+        .map(d=>({time:d.t, open:d.o, high:d.h, low:d.l, close:d.c}));
+      state.candles[c.stock_code] = rows;
+    }
+    if(!rows.length) throw new Error('시세 데이터 없음');
+    box.innerHTML = '';
+    const css = getComputedStyle(document.documentElement);
+    const v = n => css.getPropertyValue(n).trim();
+    const chart = LightweightCharts.createChart(box, {
+      autoSize: true,
+      layout: {background:{color:'transparent'}, textColor: v('--tx2'),
+               fontFamily: 'inherit'},
+      grid: {vertLines:{color:v('--line2')}, horzLines:{color:v('--line2')}},
+      rightPriceScale: {borderColor:v('--line')},
+      timeScale: {borderColor:v('--line')},
+    });
+    state.chartInst.set(c.stock_code, chart);
+    // 한국식 캔들: 상승 빨강 / 하락 파랑
+    const cs = chart.addCandlestickSeries({
+      upColor:'#e0736f', downColor:'#6aa3e0', borderVisible:false,
+      wickUpColor:'#e0736f', wickDownColor:'#6aa3e0'});
+    cs.setData(rows);
+    const lo = Math.min(...rows.map(r=>r.low)), hi = Math.max(...rows.map(r=>r.high));
+    const seen = new Set();
+    c.evs.forEach(e=>{
+      if(!e.conv_price || seen.has(e.conv_price)) return;
+      seen.add(e.conv_price);
+      const key = e.subtype==='cps' ? 'cps' : e.event_type;
+      const col = TYPE_LINE[key] || '#999';
+      const title = `${e.subtype==='cps'?'CPS':(TYPE_SHORT[e.event_type]||'')} 전환가`;
+      if(e.conv_price >= lo*0.5 && e.conv_price <= hi*2){
+        // 가시 범위 근처면 라인 시리즈로 -> 오토스케일에 포함돼 항상 보임
+        const ls = chart.addLineSeries({color:col, lineWidth:1, lineStyle:2,
+          lastValueVisible:true, priceLineVisible:false,
+          crosshairMarkerVisible:false, title});
+        ls.setData([{time:rows[0].time, value:e.conv_price},
+                    {time:rows[rows.length-1].time, value:e.conv_price}]);
+      } else {
+        // 현 주가와 크게 괴리된 전환가는 축 라벨로만 (스케일 왜곡 방지)
+        cs.createPriceLine({price:e.conv_price, color:col, lineWidth:1,
+          lineStyle:2, title, axisLabelVisible:true});
+      }
+    });
+    chart.timeScale().fitContent();
+  }catch(e){
+    box.innerHTML = `<div class="msg">차트를 불러오지 못했습니다 · ${e.message||e}</div>`;
+  }
+}
+function mountOhChart(c, card){
+  if(card.querySelector('.ohchart')) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'ohchart';
+  const note = document.createElement('div');
+  note.className = 'chartnote';
+  note.textContent = '점선 = 전환/행사가 (공시 시점 기준, 리픽싱 미반영일 수 있음) · 일봉 최근 280거래일';
+  const evbox = card.querySelector('.ohevents');
+  evbox.prepend(note); evbox.prepend(wrap);
+  renderOhChart(c, wrap);
+}
+
 function renderOh(){
   const data = ohRows(), box = $('#ohlist');
   const t = todayStr();
+  for(const ch of state.chartInst.values()){ try{ch.remove();}catch(e){} }
+  state.chartInst.clear();
   box.innerHTML = '';
   data.forEach(c=>{
     const el = document.createElement('div');
@@ -566,8 +656,10 @@ function renderOh(){
     el.querySelector('.ohhead').onclick = ()=>{
       state.ohOpen.has(c.stock_code) ? state.ohOpen.delete(c.stock_code) : state.ohOpen.add(c.stock_code);
       el.classList.toggle('open');
+      if(el.classList.contains('open')) mountOhChart(c, el);
     };
     box.appendChild(el);
+    if(state.ohOpen.has(c.stock_code)) mountOhChart(c, el);   // 재렌더 시 유지
   });
   $('#count').textContent = `${data.length}개 종목 · 전환청구 창 진행/대기 중`;
 }
