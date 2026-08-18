@@ -228,6 +228,24 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
       <option value="end">오버행 종료 임박순</option>
       <option value="value">금액 큰순</option>
     </select>
+    <select id="ohMcap" style="display:none" title="시가총액 하한">
+      <option value="">시총 전체</option>
+      <option value="500">시총 500억↑</option>
+      <option value="1000">시총 1,000억↑</option>
+      <option value="3000">시총 3,000억↑</option>
+      <option value="5000">시총 5,000억↑</option>
+      <option value="10000">시총 1조↑</option>
+      <option value="30000">시총 3조↑</option>
+    </select>
+    <select id="ohFcap" style="display:none" title="유동시총 하한">
+      <option value="">유동시총 전체</option>
+      <option value="300">유동시총 300억↑</option>
+      <option value="500">유동시총 500억↑</option>
+      <option value="1000">유동시총 1,000억↑</option>
+      <option value="3000">유동시총 3,000억↑</option>
+      <option value="5000">유동시총 5,000억↑</option>
+      <option value="10000">유동시총 1조↑</option>
+    </select>
     <button class="tgl" id="refreshBtn" title="시세·데이터 갱신">↻ 시세</button>
     <span class="chip" id="qstamp" style="display:none"></span>
     <button class="tgl" id="themeBtn" title="테마 전환">◐</button>
@@ -483,9 +501,16 @@ function ohRows(){
       pctFloat: c.float_shares ? shares/c.float_shares*100 : null,
       valueEok: close ? shares*close/1e8 : null,
       floatEok: close && c.float_shares ? c.float_shares*close/1e8 : null,
+      // 시총 = 유동주식수 / 유동비율 x 현재가 (역산)
+      mcapEok: close && c.float_shares && c.float_ratio_pct
+        ? c.float_shares/(c.float_ratio_pct/100)*close/1e8 : null,
       nearEnd: evs.reduce((m,e)=>e.end<m?e.end:m,'99999999')};
   }).filter(Boolean);
   if(q) r = r.filter(c=>(c.corp_name||'').toLowerCase().includes(q)||(c.stock_code||'').includes(q));
+  // 규모 하한 필터 (억 원). 시총·유동시총 미산출 종목은 하한 설정 시 제외.
+  const mMin = +$('#ohMcap').value || 0, fMin = +$('#ohFcap').value || 0;
+  if(mMin) r = r.filter(c=>c.mcapEok!=null && c.mcapEok >= mMin);
+  if(fMin) r = r.filter(c=>c.floatEok!=null && c.floatEok >= fMin);
   const s = $('#ohSort').value;
   if(s==='end') r.sort((a,b)=>a.nearEnd.localeCompare(b.nearEnd));
   else if(s==='value') r.sort((a,b)=>(b.valueEok??-1)-(a.valueEok??-1));
@@ -527,7 +552,7 @@ function renderOh(){
             ${c.market?`<span class="badge o">${c.market}</span>`:''}
             <span class="badge o">${c.evs.length}건</span></div>
           <div class="ohk num">${c.float_shares?`유동주식 ${nf(c.float_shares)}주 (${c.float_ratio_pct!=null?c.float_ratio_pct+'%':''})`:'유동주식수 미확보'}
-            ${c.close?` · 현재가 ${nf(c.close)}원`:''}</div>
+            ${c.mcapEok!=null?` · 시총 ${nf(c.mcapEok)}억`:''}${c.close?` · 현재가 ${nf(c.close)}원`:''}</div>
         </div>
         <div><span class="ohk">잠재물량 / 유동주식수</span>
           <div class="ohv num">${nf(c.shares)}주${c.pctFloat!=null?` · <b class="${c.pctFloat>=30?'bad':''}">${c.pctFloat.toFixed(1)}%</b>`:''}</div>
@@ -558,6 +583,8 @@ function setTab(tab){
   $('#ohlist').style.display = tab==='oh' ? '' : 'none';
   $('#fSort').style.display = tab==='cal' ? '' : 'none';
   $('#ohSort').style.display = tab==='oh' ? '' : 'none';
+  $('#ohMcap').style.display = tab==='oh' ? '' : 'none';
+  $('#ohFcap').style.display = tab==='oh' ? '' : 'none';
   render();
 }
 $('#tabCal').onclick = ()=>setTab('cal');
@@ -630,7 +657,7 @@ async function refreshQuotes(){
 }
 $('#refreshBtn').onclick=refreshQuotes;
 
-['input','change'].forEach(ev=>['#q','#fType','#fSort','#ohSort'].forEach(s=>$(s).addEventListener(ev,()=>{render();})));
+['input','change'].forEach(ev=>['#q','#fType','#fSort','#ohSort','#ohMcap','#ohFcap'].forEach(s=>$(s).addEventListener(ev,()=>{render();})));
 $('#themeBtn').onclick = ()=>{
   const r = document.documentElement;
   const cur = r.getAttribute('data-theme') || 'dark';
