@@ -535,7 +535,7 @@ function ohEvLine(c, e){
     <span class="num">${e.start?fmtD(e.start,t):'?'} ~ ${fmtD(e.end,t)}
       <span class="st ${open?'on':'wait'}">${open?'청구가능':'대기'}</span>
       <span class="dday2">${dd===0?'D-Day':'D-'+dd}</span></span>
-    ${e.refix?'<span class="badge o">리픽싱</span>':''}
+    ${e.adjusted?`<span class="badge o" title="전환가액의조정 공시 반영 (미전환 잔액 기준)">조정반영 ${fmtD(e.adjusted,t)}</span>`:(e.refix?'<span class="badge o">리픽싱</span>':'')}
     ${e.is_private?'<span class="badge o">사모</span>':''}
     ${e.adv_days!=null?`<span class="badge o">ADV ${nf(e.adv_days,1)}일</span>`:''}
   </div>`;
@@ -619,7 +619,7 @@ function mountOhChart(c, card){
   wrap.className = 'ohchart';
   const note = document.createElement('div');
   note.className = 'chartnote';
-  note.textContent = '점선 = 전환/행사가 (공시 시점 기준, 리픽싱 미반영일 수 있음) · 일봉 최근 280거래일';
+  note.textContent = '점선 = 전환/행사가 (가액조정 공시 있으면 조정 후 가액·미전환 잔액 반영, "조정반영" 배지) · 일봉 최근 280거래일';
   const evbox = card.querySelector('.ohevents');
   evbox.prepend(note); evbox.prepend(wrap);
   renderOhChart(c, wrap);
