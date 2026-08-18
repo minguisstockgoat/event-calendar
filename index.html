@@ -152,6 +152,43 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 .empty{padding:48px 20px;text-align:center;color:var(--tx2)}
 .footer{color:var(--tx3);font-size:11.5px;margin-top:22px;line-height:1.7}
 .loading{padding:60px;text-align:center;color:var(--tx2)}
+
+/* 탭 (캘린더 / 오버행) */
+.tabs{display:flex;gap:6px}
+.tab{background:var(--panel);border:1px solid var(--line);color:var(--tx2);border-radius:9px;
+  padding:6px 14px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit}
+.tab.on{background:var(--teal);border-color:var(--teal);color:var(--cream)}
+
+/* CPS(전환우선주) 유형 색 */
+.t-cps{--tc:#d98ca6}
+:root[data-theme=light] .t-cps{--tc:#b25577}
+
+/* 오버행 뷰 */
+.ohlist{display:flex;flex-direction:column;gap:8px}
+.ohcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}
+.ohhead{display:grid;grid-template-columns:minmax(160px,1.35fr) 1.25fr 1.05fr .75fr;gap:10px;
+  align-items:center;padding:10px 14px;cursor:pointer}
+@media(max-width:760px){.ohhead{grid-template-columns:1fr 1fr}}
+.ohcard:hover{border-color:var(--teal-hi)}
+.ohk{color:var(--tx3);font-size:10px}
+.ohv{font-weight:700;font-size:13.5px}
+.ohbar{height:5px;border-radius:3px;background:var(--line2);margin-top:4px;overflow:hidden;max-width:190px}
+.ohbar i{display:block;height:100%;background:var(--teal-hi)}
+.ohbar i.hi{background:#e0736f}
+.ohevents{border-top:1px solid var(--line2);padding:8px 14px;display:none}
+.ohcard.open .ohevents{display:block}
+.ohev{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:7px 0;
+  border-bottom:1px dashed var(--line2);font-size:12.5px}
+.ohev:last-child{border-bottom:none}
+.st{font-size:10px;font-weight:800;border-radius:5px;padding:1px 6px}
+.st.on{background:rgba(224,115,111,.16);color:#e0736f}
+:root[data-theme=light] .st.on{background:rgba(201,79,79,.12);color:#c94f4f}
+.st.wait{background:var(--foam-bg);color:var(--foam)}
+
+/* 자동 갱신 LIVE 칩 */
+.pulse{display:inline-block;width:7px;height:7px;border-radius:50%;background:#4fc98a;
+  margin-right:6px;animation:pu 2s infinite;vertical-align:1px}
+@keyframes pu{50%{opacity:.25}}
 </style>
 </head>
 <body>
@@ -161,16 +198,21 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
     <div>
       <div class="eyebrow">Ocean Depths · Event Intel</div>
       <h1>자본조달 이벤트 캘린더</h1>
-      <div class="sub">진행 중인 유·무상증자, CB·BW·EB의 남은 일정을 기업별 시계열로</div>
+      <div class="sub">진행 중인 유·무상증자, CB·BW·EB·CPS의 남은 일정과 전환 오버행을 기업별로</div>
     </div>
     <div class="chips" id="meta"></div>
   </header>
 
   <div class="toolbar">
+    <div class="tabs">
+      <button class="tab on" id="tabCal">📅 캘린더</button>
+      <button class="tab" id="tabOh">⚖ 오버행</button>
+    </div>
     <input type="search" id="q" placeholder="종목명·코드 검색">
     <select id="fType">
       <option value="">전체 유형</option>
       <option value="paid_capital_increase">유상증자</option>
+      <option value="cps">CPS(전환우선주)</option>
       <option value="free_capital_increase">무상증자</option>
       <option value="mixed_capital_increase">유무상증자</option>
       <option value="convertible_bond">CB</option>
@@ -181,6 +223,11 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
       <option value="next">다음 일정 임박순</option>
       <option value="recent">최근 공시순</option>
     </select>
+    <select id="ohSort" style="display:none">
+      <option value="pct">유동주식수 대비 큰순</option>
+      <option value="end">오버행 종료 임박순</option>
+      <option value="value">금액 큰순</option>
+    </select>
     <button class="tgl" id="refreshBtn" title="시세·데이터 갱신">↻ 시세</button>
     <span class="chip" id="qstamp" style="display:none"></span>
     <button class="tgl" id="themeBtn" title="테마 전환">◐</button>
@@ -188,10 +235,11 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
   </div>
   </div><!-- /topbar -->
 
-  <div class="layout">
+  <div class="layout" id="calWrap">
     <div class="list" id="list"></div>
     <aside class="detail" id="detail"><div class="empty">기업을 선택하세요</div></aside>
   </div>
+  <div class="ohlist" id="ohlist" style="display:none"></div>
 
   <div id="boot" class="loading">데이터 불러오는 중…</div>
   <div class="footer" id="footer"></div>
@@ -208,7 +256,17 @@ const TYPE_SHORT = {paid_capital_increase:'유상', free_capital_increase:'무�
 const TYPE_CLASS = {paid_capital_increase:'t-paid', free_capital_increase:'t-free',
   mixed_capital_increase:'t-mixed', convertible_bond:'t-cb',
   bond_with_warrant:'t-bw', exchangeable_bond:'t-eb'};
-const state = {data:null, sel:null, quotes:{}, qstamp:''};
+const state = {data:null, sel:null, quotes:{}, qstamp:'', tab:'cal', ohOpen:new Set()};
+// CPS(전환우선주)는 event_type=유상증자 + subtype='cps'
+const shortType = c => c.subtype==='cps' ? 'CPS' : (TYPE_SHORT[c.event_type]||'');
+const classType = c => c.subtype==='cps' ? 't-cps' : (TYPE_CLASS[c.event_type]||'');
+function typeMatch(ty, c){
+  if(!ty) return true;
+  if(ty==='cps') return c.subtype==='cps';
+  if(ty==='paid_capital_increase')
+    return c.event_type==='paid_capital_increase' || c.event_type==='mixed_capital_increase';
+  return c.event_type===ty;
+}
 // 실시간 시세가 있으면 그걸, 없으면 export 시점 최신 종가를 쓴다
 function liveClose(c){
   const q = state.quotes[c.stock_code];
@@ -251,8 +309,7 @@ function rows(){
   const q = $('#q').value.trim().toLowerCase();
   if(q) r = r.filter(c => (c.corp_name||'').toLowerCase().includes(q) || (c.stock_code||'').includes(q));
   const ty = $('#fType').value;
-  if(ty === 'paid_capital_increase') r = r.filter(c => c.event_type === ty || c.event_type === 'mixed_capital_increase');
-  else if(ty) r = r.filter(c => c.event_type === ty);
+  if(ty) r = r.filter(c => typeMatch(ty, c));
   if($('#fSort').value === 'recent') r.sort((a,b)=> b.event_date.localeCompare(a.event_date));
   else r.sort((a,b)=>{
     const x = nextItem(a), y = nextItem(b);
@@ -269,17 +326,19 @@ function renderList(){
     const nx = nextItem(c);
     const dd = nx ? ddayOf(nx.date) : null;
     const el = document.createElement('div');
-    const tc = TYPE_CLASS[c.event_type] || '';
+    const tc = classType(c);
     el.className = 'row ' + tc + (state.sel === c ? ' active' : '');
     el.onclick = ()=>{ state.sel = c; renderList(); renderDetail();
       if(innerWidth <= 860) $('#detail').scrollIntoView({behavior:'smooth'}); };
+    const oh = c.overhang;
     el.innerHTML = `
       <div class="dday ${dd!=null && dd<=7 ? 'hot':''}">${dd==null?'—':(dd===0?'D-Day':'D-'+dd)}
         <span class="dl">${nx?fmtD(nx.date,t):''}</span></div>
       <div class="rmain">
         <div class="rname">${c.corp_name} <span class="code num">${c.stock_code||''}</span>
-          <span class="badge ty ${tc}">${TYPE_SHORT[c.event_type]||''}</span>
-          ${c.market?`<span class="badge o">${c.market}</span>`:''}</div>
+          <span class="badge ty ${tc}">${shortType(c)}</span>
+          ${c.market?`<span class="badge o">${c.market}</span>`:''}
+          ${oh && oh.pct_float!=null?`<span class="badge o">오버행 유동 ${oh.pct_float.toFixed(1)}%</span>`:''}</div>
         <div class="rnext">${nx ? '다음 · ' + nx.label : '남은 일정 없음'}</div>
       </div>`;
     box.appendChild(el);
@@ -354,6 +413,25 @@ function decideCard(c){
   </div>`;
 }
 
+// 상세 패널 오버행 카드 (해당 이벤트가 전환청구 창을 갖는 경우)
+function overhangCard(c){
+  const o = c.overhang;
+  if(!o) return '';
+  const t = todayStr();
+  const live = liveClose(c);
+  const open = o.start && o.start <= t;
+  const dd = o.end >= t ? ddayOf(o.end) : null;
+  return `<div class="sec">오버행 (잠재 물량)</div>
+  <div class="decide">
+    <div><span class="k">잠재물량</span><span class="v">${nf(o.shares)}주</span></div>
+    ${o.pct_float!=null?`<div><span class="k">유동주식수 대비</span><span class="v ${o.pct_float>=20?'bad':''}">${o.pct_float.toFixed(1)}%</span></div>`:''}
+    ${live?`<div><span class="k">금액 (현재가)</span><span class="v small">${nf(o.shares*live/1e8)}억 원</span></div>`:''}
+    ${o.adv_days!=null?`<div><span class="k">ADV20 흡수</span><span class="v small">${nf(o.adv_days,1)}일치</span></div>`:''}
+    <div><span class="k">청구 창</span><span class="v small">${o.start?fmtD(o.start,t):'?'} ~ ${fmtD(o.end,t)}
+      <span class="st ${open?'on':'wait'}">${open?'청구가능':'대기'}</span>${dd!=null?` D-${dd}`:''}</span></div>
+  </div>`;
+}
+
 function renderDetail(){
   const c = state.sel, box = $('#detail');
   if(!c){ box.innerHTML = '<div class="empty">기업을 선택하세요</div>'; return; }
@@ -372,46 +450,166 @@ function renderDetail(){
         ${dd!=null && dd<=30 ? `<span class="dday2 num">${dd===0?'D-Day':'D-'+dd}</span>`:''}
       </span></li>`;
   }).join('');
-  const tc = TYPE_CLASS[c.event_type] || '';
+  const tc = classType(c);
   box.innerHTML = `
     <div class="dt-head">
       <div class="dt-name">${c.corp_name} <span class="code num">${c.stock_code||''} · ${c.market||''}</span>
-        <span class="badge ty ${tc}">${TYPE_SHORT[c.event_type]||''}</span></div>
-      <div class="dt-meta">${c.event_label} · ${fmtD(c.event_date,t)} 공시 ·
+        <span class="badge ty ${tc}">${shortType(c)}</span></div>
+      <div class="dt-meta">${c.event_label}${c.subtype==='cps'?' (전환우선주)':''} · ${fmtD(c.event_date,t)} 공시 ·
         <a href="${c.dart_url}" target="_blank" rel="noopener">DART 원문 ↗</a></div>
     </div>
     ${decideCard(c)}
+    ${overhangCard(c)}
     <div class="sec">발행 조건</div>
     <div class="kv">${termsKv(c)}</div>
     <div class="sec">일정 타임라인</div>
     <ul class="tl">${lis}</ul>`;
 }
 
+// ---------------------------------------------------------------- 오버행 탭
+function ohLive(code, fallback){
+  const q = state.quotes[code];
+  return q && q.price ? q.price : fallback;
+}
+function ohRows(){
+  const q = $('#q').value.trim().toLowerCase();
+  const ty = $('#fType').value;
+  let r = (state.data.overhang||[]).map(c=>{
+    const evs = c.events.filter(e=>typeMatch(ty, e));
+    if(!evs.length) return null;
+    const shares = evs.reduce((s,e)=>s+e.shares,0);
+    const close = ohLive(c.stock_code, c.close);
+    return {...c, evs, shares, close,
+      pctFloat: c.float_shares ? shares/c.float_shares*100 : null,
+      valueEok: close ? shares*close/1e8 : null,
+      floatEok: close && c.float_shares ? c.float_shares*close/1e8 : null,
+      nearEnd: evs.reduce((m,e)=>e.end<m?e.end:m,'99999999')};
+  }).filter(Boolean);
+  if(q) r = r.filter(c=>(c.corp_name||'').toLowerCase().includes(q)||(c.stock_code||'').includes(q));
+  const s = $('#ohSort').value;
+  if(s==='end') r.sort((a,b)=>a.nearEnd.localeCompare(b.nearEnd));
+  else if(s==='value') r.sort((a,b)=>(b.valueEok??-1)-(a.valueEok??-1));
+  else r.sort((a,b)=>(b.pctFloat??-1)-(a.pctFloat??-1));
+  return r;
+}
+function ohEvLine(c, e){
+  const t = todayStr();
+  const live = c.close;
+  const money = (live && e.conv_price) ? (live/e.conv_price-1)*100 : null;
+  const open = e.start && e.start <= t;
+  const dd = ddayOf(e.end);
+  const tc = e.subtype==='cps' ? 't-cps' : (TYPE_CLASS[e.event_type]||'');
+  return `<div class="ohev">
+    <span class="badge ty ${tc}">${e.subtype==='cps'?'CPS':(TYPE_SHORT[e.event_type]||'')}</span>
+    <a href="${e.dart_url}" target="_blank" rel="noopener">${fmtD(e.event_date,t)} 공시 ↗</a>
+    <span class="num"><b>${nf(e.shares)}</b>주${e.pct_float!=null?` · 유동 ${e.pct_float.toFixed(1)}%`:''}</span>
+    ${e.conv_price?`<span class="num">전환가 ${nf(e.conv_price)}원${money!=null?` · <b class="${money>0?'good':'bad'}">${pct(money)}</b>`:''}</span>`:''}
+    <span class="num">${e.start?fmtD(e.start,t):'?'} ~ ${fmtD(e.end,t)}
+      <span class="st ${open?'on':'wait'}">${open?'청구가능':'대기'}</span>
+      <span class="dday2">${dd===0?'D-Day':'D-'+dd}</span></span>
+    ${e.refix?'<span class="badge o">리픽싱</span>':''}
+    ${e.is_private?'<span class="badge o">사모</span>':''}
+    ${e.adv_days!=null?`<span class="badge o">ADV ${nf(e.adv_days,1)}일</span>`:''}
+  </div>`;
+}
+function renderOh(){
+  const data = ohRows(), box = $('#ohlist');
+  const t = todayStr();
+  box.innerHTML = '';
+  data.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'ohcard' + (state.ohOpen.has(c.stock_code)?' open':'');
+    const w = c.pctFloat!=null ? Math.min(100, c.pctFloat) : 0;
+    el.innerHTML = `
+      <div class="ohhead">
+        <div>
+          <div class="rname">${c.corp_name} <span class="code num">${c.stock_code||''}</span>
+            ${c.market?`<span class="badge o">${c.market}</span>`:''}
+            <span class="badge o">${c.evs.length}건</span></div>
+          <div class="ohk num">${c.float_shares?`유동주식 ${nf(c.float_shares)}주 (${c.float_ratio_pct!=null?c.float_ratio_pct+'%':''})`:'유동주식수 미확보'}
+            ${c.close?` · 현재가 ${nf(c.close)}원`:''}</div>
+        </div>
+        <div><span class="ohk">잠재물량 / 유동주식수</span>
+          <div class="ohv num">${nf(c.shares)}주${c.pctFloat!=null?` · <b class="${c.pctFloat>=30?'bad':''}">${c.pctFloat.toFixed(1)}%</b>`:''}</div>
+          ${c.pctFloat!=null?`<div class="ohbar"><i class="${c.pctFloat>=30?'hi':''}" style="width:${w}%"></i></div>`:''}</div>
+        <div><span class="ohk">금액(현재가) / 유동시총</span>
+          <div class="ohv num">${c.valueEok!=null?nf(c.valueEok)+'억':'—'}${c.floatEok!=null?` / ${nf(c.floatEok)}억`:''}</div></div>
+        <div><span class="ohk">오버행 종료</span>
+          <div class="ohv num">${fmtD(c.nearEnd,t)}${c.evs.length>1?' 외':''}</div></div>
+      </div>
+      <div class="ohevents">${c.evs.map(e=>ohEvLine(c,e)).join('')}</div>`;
+    el.querySelector('.ohhead').onclick = ()=>{
+      state.ohOpen.has(c.stock_code) ? state.ohOpen.delete(c.stock_code) : state.ohOpen.add(c.stock_code);
+      el.classList.toggle('open');
+    };
+    box.appendChild(el);
+  });
+  $('#count').textContent = `${data.length}개 종목 · 전환청구 창 진행/대기 중`;
+}
+
+function render(){
+  if(state.tab==='cal') renderList(); else renderOh();
+}
+function setTab(tab){
+  state.tab = tab;
+  $('#tabCal').classList.toggle('on', tab==='cal');
+  $('#tabOh').classList.toggle('on', tab==='oh');
+  $('#calWrap').style.display = tab==='cal' ? '' : 'none';
+  $('#ohlist').style.display = tab==='oh' ? '' : 'none';
+  $('#fSort').style.display = tab==='cal' ? '' : 'none';
+  $('#ohSort').style.display = tab==='oh' ? '' : 'none';
+  render();
+}
+$('#tabCal').onclick = ()=>setTab('cal');
+$('#tabOh').onclick = ()=>setTab('oh');
+
 function renderMeta(){
   const m = state.data.meta;
   $('#meta').innerHTML = [
     `기준 <b>${m.generated_at}</b>`,
     `진행 중 <b>${m.count}</b>건`,
-  ].map(x=>`<span class="chip">${x}</span>`).join('')
+    m.overhang_count!=null?`오버행 <b>${m.overhang_count}</b>종목`:'',
+    `<span class="pulse"></span>자동 갱신 <b id="lastChk">대기</b>`,
+  ].filter(Boolean).map(x=>`<span class="chip">${x}</span>`).join('')
   + `<button class="tgl" style="display:none"></button>`;
-  $('#footer').innerHTML = `${m.disclaimer||''} · 표시 기간 최근 ${m.window_days}일 공시 기준`;
+  $('#footer').innerHTML = `${m.disclaimer||''} · 캘린더는 최근 ${m.window_days}일, `
+    + `오버행은 최근 ${m.overhang_window_days||1200}일 발행분 중 전환청구 창이 남은 건 기준 · `
+    + `새 공시는 폴러가 감지 후 수 분 내 자동 반영`;
 }
 
 async function boot(){
   try{
     state.data = await (await fetch('calendar_data.json?'+Date.now(),{cache:'no-store'})).json();
     $('#boot').style.display='none';
-    renderMeta(); renderList();
+    renderMeta(); render();
   }catch(e){
     $('#boot').textContent = '데이터를 불러오지 못했습니다: ' + e;
   }
 }
+
+// 준실시간: 3분마다 정적 데이터 재확인, 갱신 시각이 바뀌면 자동 반영
+// (폴러가 새 공시 감지 -> export+push -> Pages 재배포 흐름을 페이지가 따라감)
+async function autoCheck(){
+  try{
+    const d = await (await fetch('calendar_data.json?'+Date.now(),{cache:'no-store'})).json();
+    if(state.data && d.meta.generated_at !== state.data.meta.generated_at){
+      const selKey = state.sel && (state.sel.stock_code + state.sel.event_date);
+      state.data = d;
+      state.sel = d.companies.find(c=>c.stock_code+c.event_date===selKey) || null;
+      renderMeta(); render(); if(state.tab==='cal') renderDetail();
+    }
+    const el = $('#lastChk');
+    if(el) el.textContent = new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ /* 다음 주기에 재시도 */ }
+}
+setInterval(autoCheck, 180000);
 // ↻ 시세: 프록시가 설정돼 있으면 실시간 시세, 아니면 최신 정적 데이터 재로드
 async function refreshQuotes(){
   const btn=$('#refreshBtn'); btn.disabled=true; btn.textContent='갱신 중…';
   try{
     if(QUOTE_PROXY){
-      const codes=[...new Set(state.data.companies.map(c=>c.stock_code).filter(Boolean))];
+      const pool = state.tab==='oh' ? (state.data.overhang||[]) : state.data.companies;
+      const codes=[...new Set(pool.map(c=>c.stock_code).filter(Boolean))];
       for(let i=0;i<codes.length;i+=40){
         const r=await fetch(`${QUOTE_PROXY}?codes=${codes.slice(i,i+40).join(',')}`);
         const j=await r.json();
@@ -428,11 +626,11 @@ async function refreshQuotes(){
   }catch(e){ state.qstamp='갱신 실패'; }
   btn.disabled=false; btn.textContent='↻ 시세';
   const st=$('#qstamp'); st.style.display=''; st.textContent=state.qstamp;
-  renderList(); renderDetail();
+  render(); if(state.tab==='cal') renderDetail();
 }
 $('#refreshBtn').onclick=refreshQuotes;
 
-['input','change'].forEach(ev=>['#q','#fType','#fSort'].forEach(s=>$(s).addEventListener(ev,()=>{renderList();})));
+['input','change'].forEach(ev=>['#q','#fType','#fSort','#ohSort'].forEach(s=>$(s).addEventListener(ev,()=>{render();})));
 $('#themeBtn').onclick = ()=>{
   const r = document.documentElement;
   const cur = r.getAttribute('data-theme') || 'dark';
