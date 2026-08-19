@@ -535,7 +535,9 @@ function ohEvLine(c, e){
     <span class="num">${e.start?fmtD(e.start,t):'?'} ~ ${fmtD(e.end,t)}
       <span class="st ${open?'on':'wait'}">${open?'청구가능':'대기'}</span>
       <span class="dday2">${dd===0?'D-Day':'D-'+dd}</span></span>
-    ${e.adjusted?`<span class="badge o" title="전환가액의조정 공시 반영 (미전환 잔액 기준)">조정반영 ${fmtD(e.adjusted,t)}</span>`:(e.refix?'<span class="badge o">리픽싱</span>':'')}
+    ${e.merge_est?`<span class="badge o" title="병합비율 ${e.merge_est}:1 역산 보정 (조정 공시 미발행 회차)">병합보정 ${e.merge_est}:1</span>`
+      :e.adjusted?`<span class="badge o" title="전환가액의조정 공시 반영 (미전환 잔액 기준)">조정반영 ${fmtD(e.adjusted,t)}</span>`
+      :(e.refix?'<span class="badge o">리픽싱</span>':'')}
     ${e.is_private?'<span class="badge o">사모</span>':''}
     ${e.adv_days!=null?`<span class="badge o">ADV ${nf(e.adv_days,1)}일</span>`:''}
   </div>`;
