@@ -184,6 +184,16 @@ h1{font-size:22px;margin:4px 0 2px;font-weight:800;letter-spacing:-.02em}
 .st.on{background:rgba(224,115,111,.16);color:#e0736f}
 :root[data-theme=light] .st.on{background:rgba(201,79,79,.12);color:#c94f4f}
 .st.wait{background:var(--foam-bg);color:var(--foam)}
+/* 오버행 종료까지 잔여 거래일 배지 (임박도 색) */
+.bd{display:inline-block;margin-left:7px;border-radius:6px;padding:1px 7px;
+  font-size:10.5px;font-weight:800;vertical-align:1px;white-space:nowrap}
+.bd.hot{background:rgba(224,115,111,.18);color:#e0736f}
+.bd.warn{background:rgba(224,164,88,.16);color:#e0a458}
+.bd.soon{background:var(--teal-bg);color:var(--teal-hi)}
+.bd.far{background:transparent;border:1px solid var(--line);color:var(--tx3);font-weight:700}
+:root[data-theme=light] .bd.hot{background:rgba(201,79,79,.12);color:#c94f4f}
+:root[data-theme=light] .bd.warn{background:rgba(169,118,42,.12);color:#a9762a}
+
 .ohchart{height:260px;margin:4px 0 2px;position:relative}
 .ohchart .msg{padding:26px 0;text-align:center;color:var(--tx3);font-size:12px}
 .chartnote{color:var(--tx3);font-size:10.5px;margin:0 0 8px}
@@ -542,6 +552,27 @@ function ohEvLine(c, e){
     ${e.adv_days!=null?`<span class="badge o">ADV ${nf(e.adv_days,1)}일</span>`:''}
   </div>`;
 }
+// 오늘~해당일까지 잔여 거래일 수 (주말 제외 근사, 공휴일 미반영)
+function bdaysUntil(dstr){
+  const t = todayStr();
+  if(!dstr || dstr <= t) return 0;
+  const d0 = new Date(+t.slice(0,4), +t.slice(4,6)-1, +t.slice(6));
+  const d1 = new Date(+dstr.slice(0,4), +dstr.slice(4,6)-1, +dstr.slice(6));
+  const n = Math.round((d1-d0)/86400000);
+  let bd = Math.floor(n/7)*5;
+  let dow = d0.getDay();
+  for(let i=0;i<n%7;i++){
+    dow = (dow+1)%7;
+    if(dow!==0 && dow!==6) bd++;
+  }
+  return bd;
+}
+function bdBadge(dstr){
+  const bd = bdaysUntil(dstr);
+  const cls = bd<=20?'hot':bd<=60?'warn':bd<=120?'soon':'far';
+  return `<span class="bd ${cls} num" title="잔여 거래일 (주말 제외 근사, 공휴일 미반영)">${nf(bd)}거래일</span>`;
+}
+
 // --- 오버행 주가 차트 (TradingView lightweight-charts + 전환가 수평선) ------
 const TYPE_LINE = {convertible_bond:'#e0a458', bond_with_warrant:'#a684ee',
   exchangeable_bond:'#6aa3e0', cps:'#d98ca6'};
@@ -652,7 +683,7 @@ function renderOh(){
         <div><span class="ohk">금액(현재가) / 유동시총</span>
           <div class="ohv num">${c.valueEok!=null?nf(c.valueEok)+'억':'—'}${c.floatEok!=null?` / ${nf(c.floatEok)}억`:''}</div></div>
         <div><span class="ohk">오버행 종료</span>
-          <div class="ohv num">${fmtD(c.nearEnd,t)}${c.evs.length>1?' 외':''}</div></div>
+          <div class="ohv num">${fmtD(c.nearEnd,t)}${c.evs.length>1?' 외':''}${bdBadge(c.nearEnd)}</div></div>
       </div>
       <div class="ohevents">${c.evs.map(e=>ohEvLine(c,e)).join('')}</div>`;
     el.querySelector('.ohhead').onclick = ()=>{
