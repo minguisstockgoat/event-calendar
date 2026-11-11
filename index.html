@@ -721,12 +721,12 @@ function renderMeta(){
     `기준 <b>${m.generated_at}</b>`,
     `진행 중 <b>${m.count}</b>건`,
     m.overhang_count!=null?`오버행 <b>${m.overhang_count}</b>종목`:'',
-    `<span class="pulse"></span>자동 갱신 <b id="lastChk">대기</b>`,
+    `<span class="pulse"></span>데이터 확인 <b id="lastChk">대기</b>`,
   ].filter(Boolean).map(x=>`<span class="chip">${x}</span>`).join('')
   + `<button class="tgl" style="display:none"></button>`;
   $('#footer').innerHTML = `${m.disclaimer||''} · 캘린더는 최근 ${m.window_days}일, `
     + `오버행은 최근 ${m.overhang_window_days||1200}일 발행분 중 전환청구 창이 남은 건 기준 · `
-    + `새 공시는 폴러가 감지 후 수 분 내 자동 반영`;
+    + `공시 수집 ${m.disclosure_collected_through||m.today} · 종가 ${m.price_asof||'기준일 확인 필요'} · 평일 08:15 / 17:45 갱신`;
 }
 
 async function boot(){
